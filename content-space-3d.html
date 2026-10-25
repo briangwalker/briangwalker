@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Space 3D Prototype — Brian's Build Log</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body.theme-purple{
+    --paper:#F6F2FA;
+    --ink:#241536;
+    --ink-soft:#5B4877;
+    --line:#DDD0EC;
+    --navy:#3D2657;
+    --navy-deep:#1F1330;
+    --gold:#7C3AED;
+    --gold-bg:#EFE7FB;
+    --card:#FFFFFF;
+    --shadow: 0 1px 2px rgba(36,21,54,.08), 0 8px 24px rgba(36,21,54,.08);
+  }
+  body.theme-purple .eyebrow{ color:#7C3AED; }
+  body.theme-purple .course-chip{ color:#C9A9FB; }
+  body.theme-purple .sitenav a:hover{ color:#C9A9FB; }
+  body.theme-purple .sitenav a.yt{ color:#C9A9FB; }
+
+  #root{ background:#17151E; }
+  .proto-note{ color:var(--ink-soft); font-size:.85rem; margin-top:1rem; }
+  .proto-note b{ color:var(--ink); font-weight:600; }
+</style>
+</head>
+<body class="theme-purple">
+
+<nav class="sitenav">
+  <div class="sitenav-inner">
+    <a href="index.html" class="">Home</a>
+    <a href="truss-bridge.html" class="">Truss Bridge</a>
+    <a href="video-space.html" class="">Video Space</a>
+    <a href="content-space-3d.html" class="active">3D Lab</a>
+    <a href="https://www.youtube.com/" target="_blank" rel="noopener" class="yt">YouTube &#8599;</a>
+  </div>
+</nav>
+
+<div class="pagehead wrap">
+  <div class="eyebrow">Prototype &mdash; v7</div>
+  <h1>Content space, in 3D</h1>
+  <p>An interactive Content-space explorer: drag to orbit, scroll/pinch to zoom, click a variable in the HUD (or use WASD / arrow keys) to adjust it live. The inset is a real second camera rendering an actual picture-in-picture POV shot &mdash; field of view and depth of field are computed from focal length, sensor width, and aperture, not faked.</p>
+</div>
+
+<div class="wrap" style="max-width:1100px;">
+  <section>
+    <div id="root"></div>
+    <p class="proto-note">Roll (<b>&rho;</b>) is the third camera-heading axis alongside yaw and pitch &mdash; set it to 90&deg; for vertical video: a rotated landscape frame, not a separate crop shape. Objects inside the computed depth-of-field range <i>and</i> inside the camera's actual view frustum get an amber outline, in both the orbit view and the POV shot itself.</p>
+    <p class="proto-note">Read more in the <a href="video-parameter-space-paper.html" style="color:#7C3AED;">full Video Parameter Space paper &rarr;</a></p>
+  </section>
+</div>
+
+<footer class="wrap">
+  <span>Prototype v7 &mdash; scoped to Content space only (camera position, heading, and a derived focus point).</span>
+  <span><a href="video-space.html">&larr; Back to Video Parameter Space</a></span>
+</footer>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.128.0/three.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+// Project Aperture — content-space-3d-prototype-v7.jsx
+// Version timestamp: 2026-08-30
+// Adds camera roll as a third heading axis; reverts aspect ratio to
+// landscape-only now that portrait is achieved via 90-degree roll.
+
+const { useEffect, useRef, useState } = React;
+
+function fmt(n, d = 2) {
+  return Number(n).toFixed(d);
+}
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function computeDoF(focalLength_mm, apertureN, sensorWidth_mm, focusDist_m) {
+  if (focusDist_m <= 0) return null;
+  const c = sensorWidth_mm / 1500;
+  const f = focalLength_mm;
+  const s = focusDist_m * 1000;
+  const H = (f * f) / (apertureN * c) + f;
+  const near = (H * s) / (H + (s - f));
+  const far = s < H ? (H * s) / (H - (s - f)) : Infinity;
+  return { near: near / 1000, far: far === Infinity ? Infinity : far / 1000 };
+}
+
+const NATIVE_SENSOR_ASPECT = 3 / 2;
+function computeCropFOV(sensorWidth_mm, focalLength_mm, targetAspect) {
+  const sensorHeight_mm = sensorWidth_mm / NATIVE_SENSOR_ASPECT;
+  const nativeHorizFOV = 2 * Math.atan(sensorWidth_mm / (2 * focalLength_mm));
+  const nativeVertFOV = 2 * Math.atan(sensorHeight_mm / (2 * focalLength_mm));
+  let horizFOV, vertFOV;
+  if (targetAspect >= NATIVE_SENSOR_ASPECT) {
+    horizFOV = nativeHorizFOV;
+    vertFOV = 2 * Math.atan(Math.tan(horizFOV / 2) / targetAspect);
+  } else {
+    vertFOV = nativeVertFOV;
+    horizFOV = 2 * Math.atan(Math.tan(vertFOV / 2) * targetAspect);
+  }
+  return { horizFOV, vertFOV };
+}
+
+// Landscape-only now that roll exists — portrait is a 90° roll of a landscape frame, not a separate crop shape.
+const ASPECT_PRESETS = [
+  { label: "1:1", value: 1 },
+  { label: "16:9", value: 16 / 9 },
+  { label: "2.39:1", value: 2.39 },
+];
+const ROLL_PRESETS = [0, 90, -90, 180];
+
+function ContentSpace3D() {
+  const [cam, setCam] = useState({ x: -4, y: -3, z: 1.6, yaw: 35, pitch: -5, roll: 0 });
+  const [focusDist, setFocusDist] = useState(7);
+  const [focalLength, setFocalLength] = useState(35);
+  const [sensorWidth, setSensorWidth] = useState(36);
+  const [aspect, setAspect] = useState(16 / 9);
+  const [aperture, setAperture] = useState(4);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const mountRef = useRef(null);
+  const povRef = useRef(null);
+  const stateRef = useRef({});
+  stateRef.current = { cam, focusDist, focalLength, sensorWidth, aspect, aperture };
+
+  const orbitRef = useRef({ azimuth: 0.9, elevation: 0.85, distance: 20 });
+
+  const walk = (deltaForward, deltaStrafe) => {
+    setCam((c) => {
+      const yawRad = (c.yaw * Math.PI) / 180;
+      const fwd = { x: Math.sin(yawRad), y: Math.cos(yawRad) };
+      const right = { x: Math.cos(yawRad), y: -Math.sin(yawRad) };
+      return { ...c, x: c.x + deltaForward * fwd.x + deltaStrafe * right.x, y: c.y + deltaForward * fwd.y + deltaStrafe * right.y };
+    });
+  };
+
+  const VARIABLES = [
+    { label: "Walk", isWalk: true },
+    { label: "x", get: () => cam.x, set: (v) => setCam((c) => ({ ...c, x: v })), min: -10, max: 10, step: 0.1 },
+    { label: "y", get: () => cam.y, set: (v) => setCam((c) => ({ ...c, y: v })), min: -10, max: 10, step: 0.1 },
+    { label: "z (elev)", get: () => cam.z, set: (v) => setCam((c) => ({ ...c, z: v })), min: 0, max: 5, step: 0.1 },
+    { label: "yaw θ", get: () => cam.yaw, set: (v) => setCam((c) => ({ ...c, yaw: v })), min: 0, max: 360, step: 2 },
+    { label: "pitch φ", get: () => cam.pitch, set: (v) => setCam((c) => ({ ...c, pitch: v })), min: -90, max: 90, step: 2 },
+    { label: "roll ρ", get: () => cam.roll, set: (v) => setCam((c) => ({ ...c, roll: v })), min: -180, max: 180, step: 2 },
+    { label: "focus dist", get: () => focusDist, set: setFocusDist, min: -8, max: 15, step: 0.2 },
+    { label: "focal len", get: () => focalLength, set: setFocalLength, min: 14, max: 200, step: 2 },
+    { label: "sensor w", get: () => sensorWidth, set: setSensorWidth, min: 10, max: 50, step: 1 },
+    { label: "aperture N", get: () => aperture, set: setAperture, min: 1.4, max: 22, step: 0.2 },
+    { label: "aspect", get: () => aspect, set: setAspect, min: 1, max: 2.4, step: 0.02 },
+  ];
+
+  const hudRef = useRef();
+  hudRef.current = { activeIndex, VARIABLES };
+
+  const adjustActive = (dir) => {
+    const { activeIndex, VARIABLES } = hudRef.current;
+    const v = VARIABLES[activeIndex];
+    if (v.isWalk) return;
+    v.set(clamp(v.get() + dir * v.step, v.min, v.max));
+  };
+  const cycleActive = (dir) => setActiveIndex((i) => (i + dir + VARIABLES.length) % VARIABLES.length);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+      const { activeIndex, VARIABLES } = hudRef.current;
+      const v = VARIABLES[activeIndex];
+      if (v.isWalk) {
+        if (["ArrowUp", "w", "W"].includes(e.key)) { e.preventDefault(); walk(0.5, 0); }
+        else if (["ArrowDown", "s", "S"].includes(e.key)) { e.preventDefault(); walk(-0.5, 0); }
+        else if (["ArrowLeft", "a", "A"].includes(e.key)) { e.preventDefault(); walk(0, -0.5); }
+        else if (["ArrowRight", "d", "D"].includes(e.key)) { e.preventDefault(); walk(0, 0.5); }
+      } else {
+        if (["ArrowUp", "w", "W"].includes(e.key)) { e.preventDefault(); adjustActive(1); }
+        else if (["ArrowDown", "s", "S"].includes(e.key)) { e.preventDefault(); adjustActive(-1); }
+        else if (["ArrowLeft", "a", "A"].includes(e.key)) { e.preventDefault(); cycleActive(-1); }
+        else if (["ArrowRight", "d", "D"].includes(e.key)) { e.preventDefault(); cycleActive(1); }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    const povMount = povRef.current;
+    const width = mount.clientWidth;
+    const height = mount.clientWidth * 0.75;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#17151E");
+
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x6a5a3f }));
+    crate.position.set(2, 2, 0.5);
+    scene.add(crate);
+
+    const personGroup = new THREE.Group();
+    const personBody = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 1.4, 12), new THREE.MeshBasicMaterial({ color: 0x3f5e6a }));
+    personBody.position.set(0, 0, 0.7);
+    const personHead = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 12), new THREE.MeshBasicMaterial({ color: 0xd8b48c }));
+    personHead.position.set(0, 0, 1.55);
+    personGroup.add(personBody, personHead);
+    personGroup.position.set(0, 5, 0);
+    scene.add(personGroup);
+
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(10, 4), new THREE.MeshBasicMaterial({ color: 0x2a2536, side: THREE.DoubleSide }));
+    wall.position.set(0, 8, 2);
+    scene.add(wall);
+
+    const focusables = [
+      { obj: crate, outline: new THREE.BoxHelper(crate, 0xc99a2e) },
+      { obj: personGroup, outline: new THREE.BoxHelper(personGroup, 0xc99a2e) },
+      { obj: wall, outline: new THREE.BoxHelper(wall, 0xc99a2e) },
+    ];
+    focusables.forEach((f) => { f.outline.visible = false; scene.add(f.outline); });
+
+    const viewCam = new THREE.PerspectiveCamera(45, width / height, 0.1, 200);
+    viewCam.up.set(0, 0, 1);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    mount.appendChild(renderer.domElement);
+
+    const grid = new THREE.GridHelper(20, 20, 0x443c5c, 0x2a2536);
+    grid.rotation.x = Math.PI / 2;
+    scene.add(grid);
+    const axesHelper = new THREE.AxesHelper(2);
+    scene.add(axesHelper);
+
+    const coneGeo = new THREE.ConeGeometry(0.35, 1, 4);
+    coneGeo.rotateX(-Math.PI / 2);
+    const gizmo = new THREE.Mesh(coneGeo, new THREE.MeshBasicMaterial({ color: 0x8b6fc4 }));
+    scene.add(gizmo);
+    // small crossbar so roll is visible on the gizmo, not just inferred
+    const rollBar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0xede7f8 }));
+    rollBar.position.set(0, 0, -0.15);
+    gizmo.add(rollBar);
+
+    const focusSphere = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), new THREE.MeshBasicMaterial({ color: 0xc99a2e }));
+    scene.add(focusSphere);
+
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xc99a2e, transparent: true }));
+    scene.add(line);
+
+    const frustumHelper = new THREE.CameraHelper(new THREE.PerspectiveCamera(45, 1, 0.1, 12));
+    scene.add(frustumHelper);
+
+    const povCam = new THREE.PerspectiveCamera(45, aspect, 0.1, 200);
+    let povWidth = 200;
+    let povHeight = povWidth / aspect;
+    const povRenderer = new THREE.WebGLRenderer({ antialias: true });
+    povRenderer.setSize(povWidth, povHeight);
+    povMount.appendChild(povRenderer.domElement);
+
+    const hideInPov = [gizmo, focusSphere, line, frustumHelper, axesHelper];
+    const worldUp = new THREE.Vector3(0, 0, 1);
+
+    let raf;
+    const animate = () => {
+      const { cam, focusDist, focalLength, sensorWidth, aspect, aperture } = stateRef.current;
+      const yawRad = (cam.yaw * Math.PI) / 180;
+      const pitchRad = (cam.pitch * Math.PI) / 180;
+      const rollRad = (cam.roll * Math.PI) / 180;
+      const dir = { x: Math.cos(pitchRad) * Math.sin(yawRad), y: Math.cos(pitchRad) * Math.cos(yawRad), z: Math.sin(pitchRad) };
+      const forward = new THREE.Vector3(dir.x, dir.y, dir.z);
+      const camPos = new THREE.Vector3(cam.x, cam.y, cam.z);
+      const focusPos = camPos.clone().addScaledVector(forward, focusDist);
+
+      // Roll: rotate the "level" up-vector around the viewing axis, then let
+      // lookAt resolve the rest. This is what a real camera does when you
+      // tilt/rotate it around its own lens axis (Dutch angle, or a 90 deg
+      // roll to shoot portrait).
+      let right0 = new THREE.Vector3().crossVectors(forward, worldUp);
+      if (right0.lengthSq() < 1e-6) right0.set(1, 0, 0);
+      right0.normalize();
+      const up0 = new THREE.Vector3().crossVectors(right0, forward).normalize();
+      const rolledUp = up0.clone().applyAxisAngle(forward, rollRad);
+
+      gizmo.position.copy(camPos);
+      gizmo.up.copy(rolledUp);
+      gizmo.lookAt(focusPos);
+
+      focusSphere.position.copy(focusPos);
+      const behind = focusDist < 0;
+      focusSphere.material.color.set(behind ? 0x6b6478 : 0xc99a2e);
+      line.material.color.set(behind ? 0x6b6478 : 0xc99a2e);
+      line.material.opacity = behind ? 0.5 : 1;
+      const posAttr = line.geometry.attributes.position;
+      posAttr.setXYZ(0, camPos.x, camPos.y, camPos.z);
+      posAttr.setXYZ(1, focusPos.x, focusPos.y, focusPos.z);
+      posAttr.needsUpdate = true;
+
+      const { horizFOV, vertFOV } = computeCropFOV(sensorWidth, focalLength, aspect);
+      const vertFovDeg = (vertFOV * 180) / Math.PI;
+
+      povCam.position.copy(camPos);
+      povCam.up.copy(rolledUp);
+      povCam.lookAt(focusPos);
+      povCam.fov = vertFovDeg;
+      povCam.aspect = aspect;
+      povCam.near = 0.1;
+      povCam.far = 200;
+      povCam.updateProjectionMatrix();
+
+      const dof = computeDoF(focalLength, aperture, sensorWidth, focusDist);
+      if (dof) {
+        povCam.near = Math.max(0.01, dof.near);
+        povCam.far = dof.far === Infinity ? 200 : dof.far;
+      } else {
+        povCam.near = 0.01;
+        povCam.far = 0.02;
+      }
+      povCam.updateProjectionMatrix();
+      povCam.updateMatrixWorld(true);
+      const frustum = new THREE.Frustum().setFromProjectionMatrix(
+        new THREE.Matrix4().multiplyMatrices(povCam.projectionMatrix, povCam.matrixWorldInverse)
+      );
+      focusables.forEach((f) => {
+        const box = new THREE.Box3().setFromObject(f.obj);
+        f.outline.update();
+        f.outline.visible = !!dof && frustum.intersectsBox(box);
+      });
+      povCam.near = 0.1;
+      povCam.far = 200;
+      povCam.updateProjectionMatrix();
+
+      frustumHelper.camera.fov = vertFovDeg;
+      frustumHelper.camera.aspect = aspect;
+      frustumHelper.camera.position.copy(camPos);
+      frustumHelper.camera.up.copy(rolledUp);
+      frustumHelper.camera.lookAt(focusPos);
+      frustumHelper.camera.updateProjectionMatrix();
+      frustumHelper.update();
+
+      const o = orbitRef.current;
+      const el = Math.max(0.05, Math.min(Math.PI - 0.05, o.elevation));
+      const r = o.distance * Math.sin(el);
+      viewCam.position.set(r * Math.sin(o.azimuth), r * Math.cos(o.azimuth), o.distance * Math.cos(el));
+      viewCam.lookAt(0, 0, 1);
+
+      renderer.render(scene, viewCam);
+      hideInPov.forEach((o) => (o.visible = false));
+      povRenderer.render(scene, povCam);
+      hideInPov.forEach((o) => (o.visible = true));
+
+      raf = requestAnimationFrame(animate);
+    };
+    animate();
+
+    const pointers = new Map();
+    let lastSingle = null;
+    let lastPinchDist = null;
+    const dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+    const onDown = (e) => {
+      try { renderer.domElement.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1) lastSingle = { x: e.clientX, y: e.clientY };
+      else if (pointers.size === 2) { const [a, b] = [...pointers.values()]; lastPinchDist = dist2(a, b); }
+    };
+    const onMoveHandler = (e) => {
+      if (!pointers.has(e.pointerId)) return;
+      e.preventDefault();
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1) {
+        const p = pointers.get(e.pointerId);
+        if (lastSingle) {
+          orbitRef.current.azimuth -= (p.x - lastSingle.x) * 0.008;
+          orbitRef.current.elevation -= (p.y - lastSingle.y) * 0.008;
+        }
+        lastSingle = { x: p.x, y: p.y };
+      } else if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        const d = dist2(a, b);
+        if (lastPinchDist) orbitRef.current.distance = clamp(orbitRef.current.distance * (lastPinchDist / d), 6, 45);
+        lastPinchDist = d;
+      }
+    };
+    const onUp = (e) => {
+      pointers.delete(e.pointerId);
+      try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (pointers.size === 1) { const [r] = [...pointers.values()]; lastSingle = { x: r.x, y: r.y }; lastPinchDist = null; }
+      else if (pointers.size === 0) { lastSingle = null; lastPinchDist = null; }
+    };
+    const onWheel = (e) => { e.preventDefault(); orbitRef.current.distance = clamp(orbitRef.current.distance * (1 + e.deltaY * 0.001), 6, 45); };
+
+    const el = renderer.domElement;
+    el.style.touchAction = "none";
+    el.addEventListener("pointerdown", onDown, { passive: false });
+    el.addEventListener("pointermove", onMoveHandler, { passive: false });
+    el.addEventListener("pointerup", onUp, { passive: false });
+    el.addEventListener("pointercancel", onUp, { passive: false });
+    el.addEventListener("wheel", onWheel, { passive: false });
+
+    const onResize = () => {
+      const w = mount.clientWidth;
+      const h = mount.clientWidth * 0.75;
+      renderer.setSize(w, h);
+      viewCam.aspect = w / h;
+      viewCam.updateProjectionMatrix();
+    };
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+      el.removeEventListener("pointerdown", onDown);
+      el.removeEventListener("pointermove", onMoveHandler);
+      el.removeEventListener("pointerup", onUp);
+      el.removeEventListener("pointercancel", onUp);
+      el.removeEventListener("wheel", onWheel);
+      mount.removeChild(renderer.domElement);
+      povMount.removeChild(povRenderer.domElement);
+      renderer.dispose();
+      povRenderer.dispose();
+    };
+  }, []);
+
+  useEffect(() => {
+    const povMount = povRef.current;
+    const canvas = povMount && povMount.querySelector("canvas");
+    if (!canvas) return;
+    const povWidth = 200;
+    const povHeight = povWidth / aspect;
+    canvas.style.width = povWidth + "px";
+    canvas.style.height = povHeight + "px";
+  }, [aspect]);
+
+  const { horizFOV } = computeCropFOV(sensorWidth, focalLength, aspect);
+  const horizFovDeg = (horizFOV * 180) / Math.PI;
+  const dof = computeDoF(focalLength, aperture, sensorWidth, focusDist);
+
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center p-6" style={{ background: "#17151E", fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <div className="w-full max-w-5xl">
+        <div className="mb-4">
+          <div className="text-xs tracking-widest uppercase mb-1" style={{ color: "#8B6FC4", letterSpacing: "0.15em" }}>
+            Content space &mdash; roll added, aspect back to landscape
+          </div>
+          <div className="text-lg" style={{ color: "#EDE7F8" }}>
+            Roll ρ is the third heading axis. Set it to 90&deg; for vertical video &mdash; a rotated landscape frame, not a different crop.
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-5">
+          <div className="rounded-lg p-2 relative" style={{ background: "#1F1C29", border: "1px solid #332D45" }}>
+            <div ref={mountRef} style={{ width: "100%" }} />
+
+            <div className="absolute top-4 right-4 flex flex-col gap-1.5 items-end" style={{ width: 200 }}>
+              <div className="rounded-md overflow-hidden" style={{ border: "2px solid #8B6FC4", boxShadow: "0 4px 16px rgba(0,0,0,0.5)" }}>
+                <div ref={povRef} />
+                <div className="text-center text-[10px] py-0.5" style={{ background: "#4B2E83", color: "#EDE7F8", fontFamily: "ui-monospace, monospace" }}>
+                  {fmt(horizFovDeg, 0)}&deg; hFOV
+                </div>
+              </div>
+
+              <div className="rounded-md w-full overflow-hidden" style={{ background: "#1F1C29", border: "1px solid #332D45" }}>
+                {VARIABLES.map((v, i) => (
+                  <button
+                    key={v.label}
+                    onClick={() => setActiveIndex(i)}
+                    className="w-full flex justify-between items-center px-2 py-1 text-[10px]"
+                    style={{
+                      background: i === activeIndex ? "#4B2E83" : "transparent",
+                      color: i === activeIndex ? "#EDE7F8" : "#8B7FA0",
+                      borderBottom: i < VARIABLES.length - 1 ? "1px solid #2A2536" : "none",
+                    }}
+                  >
+                    <span>{v.label}</span>
+                    <span style={{ fontFamily: "ui-monospace, monospace" }}>
+                      {v.isWalk ? "↑↓←→" : fmt(v.get(), v.step < 1 ? 2 : 0)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="text-xs mt-2 px-2 pb-1" style={{ color: "#544D68" }}>
+              DoF: {dof ? `${fmt(dof.near, 1)}m – ${dof.far === Infinity ? "∞" : fmt(dof.far, 1) + "m"}` : "n/a"}
+            </div>
+          </div>
+
+          <div className="rounded-lg p-4 flex flex-col gap-4" style={{ background: "#1F1C29", border: "1px solid #332D45" }}>
+            <div>
+              <div className="text-xs uppercase tracking-wide mb-2" style={{ color: "#8B6FC4" }}>Camera position</div>
+              <Slider label="x" value={cam.x} min={-10} max={10} step={0.1} onChange={(v) => setCam((c) => ({ ...c, x: v }))} />
+              <Slider label="y" value={cam.y} min={-10} max={10} step={0.1} onChange={(v) => setCam((c) => ({ ...c, y: v }))} />
+              <Slider label="z (elevation)" value={cam.z} min={0} max={5} step={0.1} onChange={(v) => setCam((c) => ({ ...c, z: v }))} />
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide mb-2" style={{ color: "#8B6FC4" }}>Camera heading</div>
+              <Slider label="&theta; yaw" value={cam.yaw} min={0} max={360} step={1} unit="&deg;" onChange={(v) => setCam((c) => ({ ...c, yaw: v }))} />
+              <Slider label="&phi; pitch" value={cam.pitch} min={-90} max={90} step={1} unit="&deg;" onChange={(v) => setCam((c) => ({ ...c, pitch: v }))} />
+              <Slider label="&rho; roll" value={cam.roll} min={-180} max={180} step={1} unit="&deg;" onChange={(v) => setCam((c) => ({ ...c, roll: v }))} accent="#4A9A7A" />
+              <div className="flex gap-1 flex-wrap mt-1">
+                {ROLL_PRESETS.map((r) => (
+                  <button key={r} onClick={() => setCam((c) => ({ ...c, roll: r }))} className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: "#161320", color: "#8B7FA0", border: "1px solid #332D45" }}>{r}&deg;</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide mb-2" style={{ color: "#C99A2E" }}>Focus distance</div>
+              <Slider label="along heading" value={focusDist} min={-8} max={15} step={0.1} onChange={setFocusDist} accent="#C99A2E" />
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide mb-2" style={{ color: "#4A9A7A" }}>Meta / Capture</div>
+              <Slider label="focal length (mm)" value={focalLength} min={14} max={200} step={1} onChange={setFocalLength} accent="#4A9A7A" />
+              <Slider label="sensor width (mm)" value={sensorWidth} min={10} max={50} step={0.5} onChange={setSensorWidth} accent="#4A9A7A" />
+              <Slider label="aperture N (f/N)" value={aperture} min={1.4} max={22} step={0.1} onChange={setAperture} accent="#4A9A7A" />
+              <div className="mb-1">
+                <Slider label="aspect ratio" value={aspect} min={1} max={2.4} step={0.02} onChange={setAspect} accent="#4A9A7A" />
+                <div className="flex gap-1 flex-wrap mt-1">
+                  {ASPECT_PRESETS.map((p) => (
+                    <button key={p.label} onClick={() => setAspect(p.value)} className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: "#161320", color: "#8B7FA0", border: "1px solid #332D45" }}>{p.label}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Slider({ label, value, min, max, step, unit = "", onChange, accent = "#8B6FC4" }) {
+  return (
+    <div className="mb-2.5">
+      <div className="flex justify-between text-xs mb-1" style={{ color: "#A79FBF" }}>
+        <span dangerouslySetInnerHTML={{ __html: label }} />
+        <span style={{ fontFamily: "ui-monospace, monospace", color: "#EDE7F8" }} dangerouslySetInnerHTML={{ __html: `${fmt(value, step < 1 ? 2 : 0)}${unit}` }} />
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value))} className="w-full" style={{ accentColor: accent }} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<ContentSpace3D />);
+</script>
+
+</body>
+</html>

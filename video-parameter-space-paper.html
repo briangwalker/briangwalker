@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Parameter Space — Full Paper — Brian's Build Log</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  /* site nav gets the same violet theme as the rest of this project */
+  body.theme-purple{
+    --navy:#3D2657;
+    --navy-deep:#1F1330;
+    --gold:#7C3AED;
+  }
+  body.theme-purple .sitenav a:hover{ color:#C9A9FB; }
+  body.theme-purple .sitenav a.yt{ color:#C9A9FB; }
+
+  /* ---- paper styling (authored separately, kept as-is) ---- */
+  :root {
+    --purple-dark: #4B2E83;
+    --purple-mid: #7C5CBF;
+    --purple-light: #EEEDFE;
+    --purple-border: #D8D2EA;
+    --ink: #1E1A2B;
+    --ink-soft: #5A5264;
+  }
+  .paper * { box-sizing: border-box; }
+  .paper {
+    background: #ffffff;
+    color: var(--ink);
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 15px;
+    line-height: 1.55;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 32px 80px 32px;
+  }
+  .paper h1.title {
+    color: var(--purple-dark);
+    font-size: 28px;
+    margin: 0 0 4px 0;
+    line-height: 1.25;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+  .paper .subtitle {
+    color: var(--ink-soft);
+    font-style: italic;
+    font-size: 15px;
+    margin: 0 0 6px 0;
+  }
+  .paper .byline {
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    margin: 0 0 18px 0;
+  }
+  .paper .rule {
+    border: none;
+    border-top: 2.5px solid var(--purple-dark);
+    margin: 0 0 22px 0;
+  }
+  .paper .rule-thin {
+    border: none;
+    border-top: 1px solid var(--purple-border);
+    margin: 6px 0 20px 0;
+  }
+  .paper .abstract {
+    background: var(--purple-light);
+    border-left: 4px solid var(--purple-dark);
+    padding: 14px 18px;
+    margin: 0 0 28px 0;
+    font-size: 14px;
+  }
+  .paper .abstract b {
+    color: var(--purple-dark);
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .paper h2 {
+    color: var(--purple-dark);
+    font-size: 19px;
+    margin: 36px 0 4px 0;
+    border-bottom: 1.5px solid var(--purple-dark);
+    padding-bottom: 4px;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+  .paper h3 {
+    color: var(--purple-mid);
+    font-size: 15.5px;
+    margin: 22px 0 6px 0;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+  .paper p { margin: 8px 0; }
+  .paper .lede { color: var(--ink-soft); font-size: 13px; margin: 0 0 14px 0; }
+  .paper table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0 18px 0;
+    font-size: 13px;
+  }
+  .paper th {
+    background: var(--purple-light);
+    color: var(--purple-dark);
+    text-align: left;
+    padding: 6px 9px;
+    border: 1px solid var(--purple-border);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .paper td {
+    padding: 5px 9px;
+    border: 1px solid var(--purple-border);
+    vertical-align: top;
+  }
+  .paper tr:nth-child(even) td { background: #FBFAFE; }
+  .paper code, .paper .mono {
+    font-family: 'Courier New', ui-monospace, monospace;
+    background: var(--purple-light);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12.5px;
+    color: var(--purple-dark);
+  }
+  .paper .figure {
+    text-align: center;
+    margin: 18px 0;
+  }
+  .paper .figure svg, .paper .figure img {
+    max-width: 100%;
+    height: auto;
+  }
+  .paper .caption {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-top: 6px;
+  }
+  .paper .callout {
+    background: var(--purple-light);
+    border: 1px solid var(--purple-border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin: 14px 0;
+  }
+  .paper .callout b { color: var(--purple-dark); }
+  .paper ul, .paper ol { font-size: 14px; padding-left: 22px; }
+  .paper li { margin: 5px 0; }
+  .paper .toc { font-size: 13.5px; columns: 2; column-gap: 30px; }
+  .paper .toc a { color: var(--purple-mid); text-decoration: none; }
+  .paper .refs { font-size: 12.5px; color: var(--ink-soft); }
+  .paper .refs li { margin: 8px 0; }
+  .paper .section-num { color: var(--purple-mid); font-weight: normal; }
+
+  .paper-footer{ max-width:820px; margin:0 auto; padding:0 32px 3rem; font-family:'IBM Plex Mono', monospace; font-size:.8rem; color:var(--ink-soft); }
+  .paper-footer a{ color:#7C3AED; text-decoration:none; }
+</style>
+</head>
+<body class="theme-purple">
+
+<nav class="sitenav">
+  <div class="sitenav-inner">
+    <a href="index.html" class="">Home</a>
+    <a href="truss-bridge.html" class="">Truss Bridge</a>
+    <a href="video-space.html" class="active">Video Space</a>
+    <a href="content-space-3d.html" class="">3D Lab</a>
+    <a href="https://www.youtube.com/" target="_blank" rel="noopener" class="yt">YouTube &#8599;</a>
+  </div>
+</nav>
+
+<div class="paper">
+
+
+<h1 class="title">Video Parameter Space</h1>
+<p class="subtitle">A Structured Model of the Measurable Variables in Video Capture, Processing, and Assembly</p>
+<p class="byline">Project Aperture — Technical Reference &middot; Working Draft &middot; Version 2026-08-30</p>
+<hr class="rule">
+
+<div class="abstract">
+<b>Abstract</b>
+This document defines a parameter space for video and photographic capture: a set of six component spaces (Meta, Content, Capture, Audio, Post, Editing) whose independent variables, together with a small number of cross-space bridge variables, fully determine a shot. Several quantities that resemble variables &mdash; frame count, depth of field, speed ratio, field of view, among others &mdash; are shown to be derived rather than independent, in a manner directly analogous to the SI distinction between base and derived physical quantities. Named cinematographic techniques (timelapse, slow-motion, rack focus) are formalized as loci: regions of the parameter space defined by a condition on its variables, rather than as additional dimensions. The model's Meta/Content split independently reproduces the intrinsic/extrinsic camera-parameter distinction used in computer vision, and its overall structure is related to the 7-dimensional plenoptic function of Adelson &amp; Bergen (1991). This draft documents the current variable set, their units and domains, boundary conditions, and open structural questions.
+</div>
+
+<h2>Contents</h2>
+<div class="toc">
+<a>1. Introduction</a>
+<a>2. Structural Overview</a>
+<a>3. Variable Reference</a>
+<a>4. Bridge Variables</a>
+<a>5. Derived Quantities</a>
+<a>6. Boundary Conditions &amp; Feasibility</a>
+<a>7. Empirical Graphs</a>
+<a>8. Named Loci</a>
+<a>9. Terminology</a>
+<a>10. Related Work</a>
+<a>11. Discussion</a>
+<a>12. Known Gaps</a>
+<a>13. Glossary</a>
+<a>14. References</a>
+</div>
+
+<h2><span class="section-num">1&ensp;</span>Introduction</h2>
+<p>The recording technology parameter space is a structured map of the measurable choices and consequences that occur across a moving-image workflow. The model is deliberately technical: it restricts itself to quantities that can be measured or set numerically (or, where necessary, categorically), and treats named creative techniques as regions within that space rather than as additional axes of it. This keeps the technical core small and falsifiable while leaving room for an open-ended catalogue of technique as the space is explored.</p>
+<p>Section 2 gives the structural overview and the map. Section 3 is the primary reference: every variable currently in the model, with its symbol, unit, and domain. Sections 4&ndash;6 cover the three structural mechanisms that connect and constrain those variables &mdash; bridge variables, derived quantities, and boundary/feasibility conditions. Section 7 presents two graphs produced from the model. Section 8 catalogues named techniques as loci. Sections 9&ndash;10 address terminology precision and prior art. Section 11 discusses what the model has revealed so far, Section 12 lists known gaps, and Sections 13&ndash;14 are reference material.</p>
+
+<h2><span class="section-num">2&ensp;</span>Structural Overview</h2>
+<p>The parameter space is organized into six <b>component spaces</b>. Five describe properties of a single shot (Meta, Content, Capture, Audio, Post); one, Editing, describes relationships across multiple shots and is the only component space whose variables are not properties of a single moment. Two confirmed <b>bridge variables</b> connect component spaces that would otherwise be fully independent, and a growing set of <b>derived quantities</b> are computed from other variables rather than chosen directly.</p>
+
+<div class="figure">
+<svg width="680" height="1048" viewBox="0 0 680 1048" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+<title>Video parameter space map</title>
+
+<rect x="40" y="40" width="280" height="212" rx="16" fill="#F0EBFA" stroke="#7C5CBF" stroke-width="1"/>
+<text x="55" y="63" font-size="14" font-weight="600" fill="#4B2E83">Meta space</text>
+<text x="55" y="80" font-size="12" fill="#7C5CBF">Applied ahead of time</text>
+<text x="55" y="104" font-size="12" fill="#7C5CBF">Lens type</text><text x="305" y="104" font-size="12" fill="#7C5CBF" text-anchor="end">(type)</text>
+<text x="55" y="126" font-size="12" fill="#7C5CBF">Focus distance</text><text x="305" y="126" font-size="12" fill="#7C5CBF" text-anchor="end">d (m)</text>
+<text x="55" y="148" font-size="12" fill="#7C5CBF">Spectrum</text><text x="305" y="148" font-size="12" fill="#7C5CBF" text-anchor="end">(band)</text>
+<text x="55" y="170" font-size="12" fill="#7C5CBF">Resolution*</text><text x="305" y="170" font-size="12" fill="#7C5CBF" text-anchor="end">R (px x px)</text>
+<text x="55" y="192" font-size="12" fill="#7C5CBF">Sensor size</text><text x="305" y="192" font-size="12" fill="#7C5CBF" text-anchor="end">w x h (mm)</text>
+<text x="55" y="214" font-size="12" fill="#7C5CBF">Aspect ratio</text><text x="305" y="214" font-size="12" fill="#7C5CBF" text-anchor="end">(w:h)</text>
+
+<rect x="340" y="40" width="280" height="212" rx="16" fill="#EDE6F7" stroke="#6D4FA0" stroke-width="1"/>
+<text x="355" y="63" font-size="14" font-weight="600" fill="#4B2E83">Content space</text>
+<text x="355" y="80" font-size="12" fill="#6D4FA0">Two vectors, no subject</text>
+<text x="355" y="104" font-size="12" fill="#6D4FA0">Camera position</text><text x="605" y="104" font-size="12" fill="#6D4FA0" text-anchor="end">(x, y, z)</text>
+<text x="355" y="126" font-size="12" fill="#6D4FA0">Camera heading</text><text x="605" y="126" font-size="12" fill="#6D4FA0" text-anchor="end">(psi, theta, phi)</text>
+<text x="355" y="150" font-size="12" fill="#6D4FA0">Distance to a point</text><text x="605" y="150" font-size="12" fill="#6D4FA0" text-anchor="end">|d| derived</text>
+
+<line x1="320" y1="252" x2="285" y2="270" stroke="#4B2E83" stroke-width="1.5"/>
+<line x1="375" y1="270" x2="340" y2="252" stroke="#4B2E83" stroke-width="1.5"/>
+<rect x="255" y="256" width="150" height="26" rx="13" fill="#E9E1F5" stroke="#4B2E83" stroke-width="1"/>
+<text x="330" y="273" font-size="12" fill="#4B2E83" text-anchor="middle">Focal length — f (mm)</text>
+
+<line x1="180" y1="252" x2="180" y2="282" stroke="#A79BC7" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="282" width="280" height="240" rx="20" fill="#EEEDFE" stroke="#534AB7" stroke-width="1"/>
+<text x="55" y="305" font-size="14" font-weight="600" fill="#3C3489">Capture space (video)</text>
+<text x="55" y="322" font-size="12" fill="#534AB7">Every variable is f(Time)</text>
+<text x="55" y="346" font-size="12" fill="#534AB7">Rec rate</text><text x="305" y="346" font-size="12" fill="#534AB7" text-anchor="end">R (fps)</text>
+<text x="55" y="368" font-size="12" fill="#534AB7">Play rate</text><text x="305" y="368" font-size="12" fill="#534AB7" text-anchor="end">P (fps, +/-)</text>
+<text x="55" y="390" font-size="12" fill="#534AB7">Exposure</text><text x="305" y="390" font-size="12" fill="#534AB7" text-anchor="end">te (sec)</text>
+<text x="55" y="412" font-size="12" fill="#534AB7">Aperture</text><text x="305" y="412" font-size="12" fill="#534AB7" text-anchor="end">N (f/N)</text>
+<text x="55" y="434" font-size="12" fill="#534AB7">ISO</text><text x="305" y="434" font-size="12" fill="#534AB7" text-anchor="end">S (ISO#)</text>
+<text x="55" y="458" font-size="12" fill="#534AB7">Frame count = floor(R x t), derived</text>
+<line x1="55" y1="482" x2="305" y2="482" stroke="#3C3489" stroke-width="2" opacity="0.6" marker-end="url(#arrow2)"/>
+<circle cx="55" cy="482" r="3" fill="#3C3489" opacity="0.8"/>
+<text x="55" y="502" font-size="12" fill="#534AB7">Time - t (sec), continuous</text>
+
+<rect x="340" y="282" width="280" height="240" rx="16" fill="#E9E1F5" stroke="#4B2E83" stroke-width="1"/>
+<text x="355" y="305" font-size="14" font-weight="600" fill="#4B2E83">Audio space</text>
+<text x="355" y="322" font-size="12" fill="#4B2E83">Parallel capture stream</text>
+<text x="355" y="346" font-size="12" fill="#4B2E83">Sample rate</text><text x="605" y="346" font-size="12" fill="#4B2E83" text-anchor="end">fs (Hz)</text>
+<text x="355" y="368" font-size="12" fill="#4B2E83">Bit depth</text><text x="605" y="368" font-size="12" fill="#4B2E83" text-anchor="end">(bits)</text>
+<text x="355" y="390" font-size="12" fill="#4B2E83">Gain</text><text x="605" y="390" font-size="12" fill="#4B2E83" text-anchor="end">(dB)</text>
+<text x="355" y="412" font-size="12" fill="#4B2E83">Mic position</text><text x="605" y="412" font-size="12" fill="#4B2E83" text-anchor="end">(x, y, z)</text>
+<text x="355" y="434" font-size="12" fill="#4B2E83">Mic heading</text><text x="605" y="434" font-size="12" fill="#4B2E83" text-anchor="end">(psi, theta, phi)</text>
+<text x="355" y="456" font-size="12" fill="#4B2E83">Pickup pattern</text><text x="605" y="456" font-size="12" fill="#4B2E83" text-anchor="end">(polar type)</text>
+<text x="355" y="480" font-size="12" fill="#4B2E83">Pattern gates whether heading matters</text>
+
+<line x1="180" y1="522" x2="180" y2="535" stroke="#4B2E83" stroke-width="1.5"/>
+<line x1="180" y1="561" x2="180" y2="574" stroke="#4B2E83" stroke-width="1.5"/>
+<rect x="105" y="535" width="150" height="26" rx="13" fill="#E9E1F5" stroke="#4B2E83" stroke-width="1"/>
+<text x="180" y="552" font-size="12" fill="#4B2E83" text-anchor="middle">White balance — K (kelvin)</text>
+
+<rect x="40" y="574" width="280" height="160" rx="16" fill="#F0EBFA" stroke="#7C5CBF" stroke-width="1"/>
+<text x="55" y="597" font-size="14" font-weight="600" fill="#4B2E83">Post space</text>
+<text x="55" y="614" font-size="12" fill="#7C5CBF">After capture, per-shot</text>
+<text x="55" y="638" font-size="12" fill="#7C5CBF">Color grading</text><text x="305" y="638" font-size="12" fill="#7C5CBF" text-anchor="end">(curve)</text>
+<text x="55" y="660" font-size="12" fill="#7C5CBF">LUTs</text><text x="305" y="660" font-size="12" fill="#7C5CBF" text-anchor="end">(mapping)</text>
+<text x="55" y="682" font-size="12" fill="#7C5CBF">Contrast</text><text x="305" y="682" font-size="12" fill="#7C5CBF" text-anchor="end">gamma (slope)</text>
+<text x="55" y="704" font-size="12" fill="#7C5CBF">Blur/sharp</text><text x="305" y="704" font-size="12" fill="#7C5CBF" text-anchor="end">sigma (px)</text>
+
+<rect x="340" y="574" width="280" height="244" rx="16" fill="none" stroke="#A79BC7" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="355" y="597" font-size="14" font-weight="600" fill="#4B2E83">Derived readouts</text>
+<text x="355" y="614" font-size="12" fill="#A79BC7">Not independent axes</text>
+<text x="355" y="638" font-size="12" fill="#4B2E83">Frame count: n = floor(R.t)</text>
+<text x="355" y="660" font-size="12" fill="#4B2E83">Depth of field: DoF = f(N, focal, d)</text>
+<text x="355" y="682" font-size="12" fill="#4B2E83">Framing: Fr = f(d, focal, AR, sensor)</text>
+<text x="355" y="704" font-size="12" fill="#4B2E83">Speed ratio: v = P / R</text>
+<text x="355" y="726" font-size="12" fill="#4B2E83">Shutter angle: a = (te / (1/R)) x 360</text>
+<text x="355" y="748" font-size="12" fill="#4B2E83">Distance to a point: |d| = |Cam - pt|</text>
+<text x="355" y="770" font-size="12" fill="#4B2E83">Field of view: FOV = f(sensor, f, AR)</text>
+<text x="355" y="792" font-size="12" fill="#4B2E83">Native sensor AR: = sensor w / h</text>
+
+<line x1="180" y1="734" x2="180" y2="848" stroke="#A79BC7" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M480,522 L480,538 L635,538 L635,838 L602,848" fill="none" stroke="#A79BC7" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="848" width="580" height="160" rx="16" fill="#EDE6F7" stroke="#6D4FA0" stroke-width="1"/>
+<text x="55" y="871" font-size="14" font-weight="600" fill="#4B2E83">Editing space</text>
+<text x="55" y="888" font-size="12" fill="#6D4FA0">Operates across multiple shots</text>
+<text x="55" y="912" font-size="12" fill="#6D4FA0">Cut points</text><text x="605" y="912" font-size="12" fill="#6D4FA0" text-anchor="end">{t1, t2, ...}</text>
+<text x="55" y="934" font-size="12" fill="#6D4FA0">Sequence order</text><text x="605" y="934" font-size="12" fill="#6D4FA0" text-anchor="end">permutation s</text>
+<text x="55" y="956" font-size="12" fill="#6D4FA0">A/V sync offset</text><text x="605" y="956" font-size="12" fill="#6D4FA0" text-anchor="end">dt (sec)</text>
+<text x="55" y="978" font-size="12" fill="#6D4FA0">Pacing</text><text x="605" y="978" font-size="12" fill="#6D4FA0" text-anchor="end">cuts/min</text>
+
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="#A79BC7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+<marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="#3C3489" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+</svg>
+
+
+<div class="caption">Figure 1. The six component spaces, their variables, confirmed bridge variables, and derived quantities. Dashed border denotes the derived-quantities set, which is not itself a component space.</div>
+</div>
+
+<h2><span class="section-num">3&ensp;</span>Variable Reference</h2>
+<p class="lede">Full unit and domain breakdown for every independent variable currently in the model, organized by component space. Domains marked <span class="mono">technological</span> are bounded by current hardware and expected to shift over time; domains marked <span class="mono">physical</span> or <span class="mono">definitional</span> are not.</p>
+
+<h3>3.1&ensp;Meta space &mdash; applied ahead of time</h3>
+<table>
+<tr><th>Variable</th><th>Symbol</th><th>Unit</th><th>Domain</th><th>Constraint type</th></tr>
+<tr><td>Lens type</td><td>&mdash;</td><td>categorical</td><td>finite set (prime, zoom, macro, fisheye, tilt-shift, &hellip;)</td><td>definitional</td></tr>
+<tr><td>Focus distance</td><td>d</td><td>m</td><td>(0, &infin;)</td><td>physical</td></tr>
+<tr><td>Spectrum</td><td>&mdash;</td><td>categorical</td><td>{visible, infrared, ultraviolet, X-ray, &hellip;}</td><td>technological &mdash; hard wall between bands, not a soft limit</td></tr>
+<tr><td>Resolution*</td><td>R</td><td>px &times; px</td><td>positive integer pairs</td><td>technological; * tier-2 mid-exposure variability (see &sect;6)</td></tr>
+<tr><td>Sensor size</td><td>&mdash;</td><td>mm &times; mm (w &times; h)</td><td>positive reals</td><td>technological</td></tr>
+<tr><td>Aspect ratio</td><td>&mdash;</td><td>w:h</td><td>[1, ~2.4] &mdash; landscape only</td><td>definitional; portrait achieved via Roll (&sect;3.2), not a separate domain</td></tr>
+</table>
+
+<h3>3.2&ensp;Content space &mdash; geometry only, no privileged "subject"</h3>
+<table>
+<tr><th>Variable</th><th>Symbol</th><th>Unit</th><th>Domain</th><th>Constraint type</th></tr>
+<tr><td>Camera position</td><td>(x, y, z)</td><td>m</td><td>&#8477;&sup3; (unbounded)</td><td>physical</td></tr>
+<tr><td>Camera yaw</td><td>&psi;</td><td>degrees</td><td>[0, 360) &mdash; cyclic</td><td>definitional</td></tr>
+<tr><td>Camera pitch</td><td>&theta;</td><td>degrees</td><td>[&minus;90, 90]</td><td>physical &mdash; gimbal-lock boundary at the poles</td></tr>
+<tr><td>Camera roll</td><td>&phi;</td><td>degrees</td><td>(&minus;180, 180] &mdash; cyclic</td><td>definitional; 90&deg; is the landscape&rarr;portrait case</td></tr>
+</table>
+<div class="callout"><b>Resolved.</b> Now that all three rotation axes are in simultaneous use, adopted the standard aerospace/gimbal convention &mdash; &psi; yaw, &theta; pitch, &phi; roll &mdash; in place of the project's earlier ad hoc &theta;/&phi;/&rho; assignment. Applies to both Camera heading and Mic heading (&sect;3.4). <b>Action item:</b> the interactive prototype (content-space-3d-prototype-v7.jsx) still uses the old symbols internally and needs updating to match when prototyping resumes.</div>
+
+<h3>3.3&ensp;Capture space (video) &mdash; every variable is a function of Time</h3>
+<table>
+<tr><th>Variable</th><th>Symbol</th><th>Unit</th><th>Domain</th><th>Constraint type</th></tr>
+<tr><td>Recording rate</td><td>R</td><td>fps</td><td>(0, +&infin;)</td><td>physical &mdash; time only moves forward during capture</td></tr>
+<tr><td>Playback rate</td><td>P</td><td>fps</td><td>&#8477; (all reals, including 0)</td><td>directional; P = 0 combined with n = 1 is the precise definition of a photograph (&sect;8)</td></tr>
+<tr><td>Exposure</td><td>t<sub>e</sub></td><td>sec</td><td>(0, 1/R]</td><td>physical &mdash; bounded by the frame interval itself</td></tr>
+<tr><td>Aperture</td><td>N</td><td>f/N</td><td>~[0.95, 64]</td><td>technological (lower) / diffraction-physical (upper)</td></tr>
+<tr><td>ISO</td><td>S</td><td>ISO number</td><td>~[25, 100,000+]</td><td>technological &mdash; ceiling rises with sensor tech</td></tr>
+<tr><td>Time</td><td>t</td><td>sec</td><td>[0, shot duration] &mdash; continuous</td><td>physical; the spine every other Capture variable is a function of</td></tr>
+</table>
+
+<h3>3.4&ensp;Audio space &mdash; parallel capture stream</h3>
+<table>
+<tr><th>Variable</th><th>Symbol</th><th>Unit</th><th>Domain</th><th>Constraint type</th></tr>
+<tr><td>Sample rate</td><td>f<sub>s</sub></td><td>Hz</td><td>standard values (44.1k, 48k, 96k, &hellip;)</td><td>technological</td></tr>
+<tr><td>Bit depth</td><td>&mdash;</td><td>bits</td><td>{16, 24, 32}</td><td>technological</td></tr>
+<tr><td>Gain</td><td>&mdash;</td><td>dB</td><td>hardware-bounded</td><td>technological</td></tr>
+<tr><td>Mic position</td><td>(x, y, z)</td><td>m</td><td>&#8477;&sup3;</td><td>physical</td></tr>
+<tr><td>Mic heading</td><td>(&psi;, &theta;, &phi;)</td><td>degrees</td><td>same as camera heading</td><td>physical &mdash; roll included since directional pickup patterns (&sect;3.4 below) can make mic roll acoustically meaningful, not just cosmetic</td></tr>
+<tr><td>Pickup pattern</td><td>&mdash;</td><td>categorical</td><td>{omni, cardioid, shotgun, &hellip;}</td><td>definitional &mdash; gates whether heading has any effect</td></tr>
+</table>
+
+<h3>3.5&ensp;Post space &mdash; after capture, per shot</h3>
+<table>
+<tr><th>Variable</th><th>Symbol</th><th>Unit</th><th>Domain</th><th>Constraint type</th></tr>
+<tr><td>Color grading</td><td>&mdash;</td><td>curve / categorical</td><td>function space</td><td>definitional</td></tr>
+<tr><td>LUTs</td><td>&mdash;</td><td>mapping</td><td>function space</td><td>definitional</td></tr>
+<tr><td>Contrast</td><td>&gamma;</td><td>slope, unitless</td><td>(0, &infin;), 1 = neutral</td><td>definitional</td></tr>
+<tr><td>Blur / sharpness</td><td>&sigma;</td><td>px</td><td>[0, &infin;)</td><td>physical &mdash; Gaussian kernel spread</td></tr>
+</table>
+
+<h3>3.6&ensp;Editing space &mdash; operates across multiple shots</h3>
+<table>
+<tr><th>Variable</th><th>Symbol</th><th>Unit</th><th>Domain</th><th>Constraint type</th></tr>
+<tr><td>Cut points</td><td>{t<sub>1</sub>, t<sub>2</sub>, &hellip;}</td><td>sec</td><td>ordered subset of shot duration</td><td>definitional</td></tr>
+<tr><td>Sequence order</td><td>&pi;</td><td>permutation</td><td>S<sub>n</sub> (symmetric group)</td><td>definitional</td></tr>
+<tr><td>A/V sync offset</td><td>&Delta;t</td><td>sec</td><td>&#8477; &mdash; sign gives J-cut vs. L-cut</td><td>definitional</td></tr>
+<tr><td>Pacing</td><td>&mdash;</td><td>cuts/min</td><td>[0, &infin;)</td><td>physical</td></tr>
+</table>
+
+<h2><span class="section-num">4&ensp;</span>Bridge Variables</h2>
+<p class="lede">A bridge variable is one whose value is shared between two component spaces &mdash; it can be set, or its effect realized, at either end.</p>
+<table>
+<tr><th>Variable</th><th>Symbol</th><th>Unit</th><th>Connects</th><th>Rationale</th></tr>
+<tr><td>Focal length</td><td>f</td><td>mm</td><td>Content &harr; Meta</td><td>Determines field of view (Content-relevant) but is a lens property set in Meta</td></tr>
+<tr><td>White balance</td><td>K</td><td>kelvin</td><td>Capture &harr; Post</td><td>Can be set live at capture or corrected equivalently in grading</td></tr>
+</table>
+<div class="callout"><b>Resolved.</b> Aspect ratio stays a Meta-space variable, not a bridge. A later change in Editing (e.g. re-cropping for a different platform) is ordinary Editing-space work and doesn't need a dedicated structural callout.</div>
+
+<h2><span class="section-num">5&ensp;</span>Derived Quantities</h2>
+<p class="lede">Values that resemble independent variables but are fully determined by other variables. The tell: if a value falls out once the rest of the space is fixed, it is not an axis. Directly analogous to the SI distinction between base quantities (length, time) and derived quantities (velocity, force).</p>
+<table>
+<tr><th>Quantity</th><th>Formula</th></tr>
+<tr><td>Frame count</td><td>n = &lfloor;R &times; t&rfloor;</td></tr>
+<tr><td>Depth of field</td><td>DoF = f(N, focal length, focus distance)</td></tr>
+<tr><td>Framing</td><td>Fr = f(distance, focal length, aspect ratio, sensor size)</td></tr>
+<tr><td>Speed ratio</td><td>v = P / R</td></tr>
+<tr><td>Shutter angle</td><td>&alpha; = (t<sub>e</sub> / (1/R)) &times; 360&deg;</td></tr>
+<tr><td>Distance to a point</td><td>|&Delta;| = |camera position &minus; point|</td></tr>
+<tr><td>Field of view</td><td>FOV = f(sensor size, focal length, aspect ratio) &mdash; crop-consistent form in &sect;5.1</td></tr>
+<tr><td>Native sensor aspect ratio</td><td>= sensor width / sensor height</td></tr>
+</table>
+
+<h3>5.1&ensp;Field of view, crop-consistent form</h3>
+<p>A naive formula (horizontal FOV fixed by sensor width and focal length, vertical FOV obtained by dividing by aspect ratio) allows a portrait crop to capture <i>more</i> vertical field of view than the sensor physically sees &mdash; a real error, not a rounding artifact. The corrected form holds whichever dimension is not being cropped at its native value:</p>
+<p class="mono" style="display:block; padding:10px; margin:8px 0;">
+native horizontal FOV = 2&middot;atan( sensor width / (2 &times; focal length) )<br>
+native vertical FOV &nbsp;= 2&middot;atan( sensor height / (2 &times; focal length) )<br>
+if target aspect &ge; native aspect: horizontal FOV = native; vertical FOV shrinks<br>
+else: vertical FOV = native; horizontal FOV shrinks
+</p>
+<p>This guarantees a crop only ever removes field of view. It is the correct model for genuine in-camera or in-post cropping; it is not the mechanism this project now uses for portrait video specifically (see Camera roll, &sect;3.2, and Loci, &sect;8).</p>
+
+<h2><span class="section-num">6&ensp;</span>Boundary Conditions &amp; Feasibility</h2>
+<h3>6.1&ensp;Three constraint types</h3>
+<ul>
+<li><b>Physical</b> &mdash; follows from what the quantity means; will never change (e.g. exposure cannot exceed the frame interval).</li>
+<li><b>Technological</b> &mdash; bounded by current hardware; expected to shift over time (e.g. ISO ceiling, aperture extremes).</li>
+<li><b>Definitional</b> &mdash; follows from how the variable is defined, independent of physics or hardware (e.g. sequence order lives in a permutation group).</li>
+</ul>
+<h3>6.2&ensp;Feasibility tiers</h3>
+<ol>
+<li><b>Impossible by definition</b> &mdash; the concept itself breaks down (negative aperture, negative ISO).</li>
+<li><b>Theoretically coherent, not natively achievable</b> &mdash; a valid value with no current direct-capture mechanism (continuously variable resolution mid-exposure).</li>
+<li><b>Achievable today</b> &mdash; real equipment does this now (focus racking, zoom-burst, exposure ramping, speed ramping).</li>
+</ol>
+<div class="callout"><b>Worked boundary case.</b> Photography is the point {n = 1, P = 0} in Capture space &mdash; a single frame, held open indefinitely rather than advancing. It requires no special-case rule; it falls directly out of Playback rate's domain including zero.</div>
+
+<h2><span class="section-num">7&ensp;</span>Empirical Graphs</h2>
+<h3>7.1&ensp;Recording rate vs. playback rate</h3>
+<p>Speed ratio (v = P/R) separates timelapse, slow-motion, and normal-speed footage. Points below the reference line are sped up; points above are slowed down.</p>
+<div class="figure">
+<img src="graph-1.jpg" style="max-width:480px;">
+</div>
+
+<h3>7.2&ensp;Small multiples across the exposure triangle</h3>
+<p>Reading across a row of shots reveals cross-axis relationships a single scatter plot cannot: the slow-motion shot's wide aperture and high ISO compensate for its fast recording rate; the star-trail timelapse's narrow aperture and low ISO reflect its already-long per-frame exposure.</p>
+<div class="figure">
+<img src="graph-2.jpg" style="max-width:540px;">
+</div>
+
+<h2><span class="section-num">8&ensp;</span>Named Loci</h2>
+<p class="lede">A <b>locus</b> is a region of a component space defined by a condition on its variables &mdash; the precise term for what this document informally calls a "subspace." A named technique is a label for a locus, not an additional dimension.</p>
+<table>
+<tr><th>Locus</th><th>Defining condition</th><th>Space</th></tr>
+<tr><td>Normal video</td><td>v &asymp; 1</td><td>Capture</td></tr>
+<tr><td>Timelapse</td><td>v &Gt; 1 (R &Lt; P)</td><td>Capture</td></tr>
+<tr><td>Slow-motion</td><td>v &Lt; 1 (R &Gt; P)</td><td>Capture</td></tr>
+<tr><td>Photograph</td><td>n = 1, P = 0</td><td>Capture</td></tr>
+<tr><td>Star-trail timelapse</td><td>Timelapse &and; t<sub>e</sub> &asymp; 1/R</td><td>Capture</td></tr>
+<tr><td>Hyperlapse</td><td>Timelapse &and; camera position varies between frames</td><td>Capture + Content</td></tr>
+<tr><td>Stop-motion</td><td>n &gt; 1, frames not spaced by a continuous rate</td><td>Capture</td></tr>
+<tr><td>Zoom-burst</td><td>Focal length varied continuously during one exposure</td><td>Meta (dynamic)</td></tr>
+<tr><td>Rack focus (optical)</td><td>Focus distance varied over Time within a shot</td><td>Capture (dynamic)</td></tr>
+<tr><td>Digital focus reveal</td><td>Blur &sigma; keyframed over an edited timeline</td><td>Post (dynamic) &mdash; convergent effect with rack focus</td></tr>
+<tr><td>Vertical / portrait video</td><td>Roll &rho; = 90&deg; on a landscape-aspect frame</td><td>Content</td></tr>
+<tr><td>J-cut / L-cut</td><td>&Delta;t &ne; 0 at a cut point</td><td>Editing</td></tr>
+</table>
+
+<h2><span class="section-num">9&ensp;</span>Terminology</h2>
+<p>A linear-algebra subspace must contain the zero vector and be closed under addition and scalar multiplication. Categorical variables (lens type, spectrum, pickup pattern) and bounded-positive domains (aperture, ISO) fail this test, so the structure documented here is more accurately a <b>parameter space</b> &mdash; a general term from physics and engineering for a space of measurable settings, requiring no vector-space axioms. The six named spaces are its <b>component spaces</b>; named techniques (&sect;8) are <b>loci</b>, not subspaces in the linear-algebra sense. "Space" and "subspace" persist as informal working names throughout this document; this section is the precise cross-reference.</p>
+
+<h2><span class="section-num">10&ensp;</span>Related Work</h2>
+<p>Adelson &amp; Bergen's 1991 plenoptic function models all light in a scene as a 7-dimensional function of position (x, y, z), direction (&theta;, &Phi;), wavelength, and time &mdash; closely related to this document's Content and Meta spaces, reached independently from the opposite direction (modeling light itself, rather than capture settings).</p>
+<p>Standard computer vision divides camera parameters into <b>intrinsic</b> (focal length, sensor and resolution properties) and <b>extrinsic</b> (position and orientation) &mdash; matching this document's Meta/Content split. This division was reconstructed independently before the established terms were identified; Section 2's Meta/Content pairing is the same distinction under different names.</p>
+
+<h2><span class="section-num">11&ensp;</span>Discussion</h2>
+<ul>
+<li>Every Capture-space variable is a function of Time; "static" is the special case where that function is constant. Rack focus, zoom-burst, and exposure ramping are all instances of the same underlying behavior.</li>
+<li>Several apparent variables (&sect;5) turned out to be derived quantities. The general test &mdash; does the value fall out once the rest of the space is fixed &mdash; generalized cleanly across frame count, DoF, speed ratio, shutter angle, and now FOV.</li>
+<li>Two structurally unrelated mechanisms can converge on the same visible effect: an optical rack focus and a keyframed Post-space blur look similar but live in different component spaces.</li>
+<li>Camera roll (&sect;3.2) resolved a real bug in the earlier aspect-ratio model, in which portrait crops captured more vertical field of view than the sensor could physically see. Modeling portrait video as a 90&deg; roll of a landscape frame is both the fix and, per informal review, closer to how a meaningful fraction of real vertical video is actually produced.</li>
+<li>Symbol collisions are worth auditing once a model accumulates enough variables: R (Recording rate vs. Resolution), the original &sigma; (Blur vs. Sequence order, resolved by renaming to &pi;), and &theta;/&phi;/&rho; vs. standard aerospace &psi;/&theta;/&phi; (&sect;3.2, now resolved by adopting the standard convention) are three instances of the same failure mode appearing independently.</li>
+</ul>
+
+<h2><span class="section-num">12&ensp;</span>Known Gaps</h2>
+<ul>
+<li><b>Distribution space</b> &mdash; codec, compression, container format, and delivery constraints. The one stage of the standard production pipeline (development &rarr; pre-production &rarr; production &rarr; post-production &rarr; distribution) with no representation here.</li>
+<li><b>Sensor height</b> is currently a hardcoded constant (3:2 native assumption) in the interactive prototype rather than a real paired input alongside Sensor width.</li>
+<li><b>Interactive prototype out of sync</b> &mdash; the yaw/pitch/roll symbol convention was corrected in this document (&sect;3.2) but not yet back-applied to content-space-3d-prototype-v7.jsx.</li>
+</ul>
+
+<h2><span class="section-num">13&ensp;</span>Glossary</h2>
+<table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<tr><td>Parameter space</td><td>A space of measurable settings; does not require vector-space axioms</td></tr>
+<tr><td>Component space</td><td>One of the six named factors making up the parameter space</td></tr>
+<tr><td>Locus</td><td>A region of a component space defined by a condition on its variables</td></tr>
+<tr><td>Bridge variable</td><td>A variable shared by, and settable from, two component spaces</td></tr>
+<tr><td>Derived quantity</td><td>Computed from other variables; not independently chosen</td></tr>
+<tr><td>Feasibility tier</td><td>Impossible by definition / theoretically valid but unbuilt / achievable today</td></tr>
+<tr><td>Convergent effect</td><td>Two structurally different mechanisms producing a similar visible result</td></tr>
+<tr><td>Speed ratio</td><td>Playback rate &divide; recording rate</td></tr>
+<tr><td>Exposure triangle</td><td>Exposure time, aperture, and ISO jointly trading off to hold brightness</td></tr>
+<tr><td>Shutter angle</td><td>Exposure time expressed as a fraction of the frame interval</td></tr>
+<tr><td>Time spine</td><td>The continuous axis every Capture-space variable is a function of</td></tr>
+<tr><td>Symbol collision</td><td>Two variables assigned the same letter; resolved by context or renaming</td></tr>
+<tr><td>Intrinsic / extrinsic parameters</td><td>Standard computer-vision terms matching Meta (intrinsic) and Content (extrinsic)</td></tr>
+<tr><td>Plenoptic function</td><td>Adelson &amp; Bergen's 1991 7D model of light; related prior work (&sect;10)</td></tr>
+</table>
+
+<h2><span class="section-num">14&ensp;</span>References</h2>
+<ol class="refs">
+<li>Adelson, E. H., &amp; Bergen, J. R. (1991). The plenoptic function and the elements of early vision. <i>Computational Models of Visual Processing</i>, MIT Press.</li>
+<li>Hartley, R., &amp; Zisserman, A. (2004). <i>Multiple View Geometry in Computer Vision</i> (2nd ed.) &mdash; standard reference for the intrinsic/extrinsic camera parameter split (&sect;10).</li>
+<li>Bureau International des Poids et Mesures. <i>The International System of Units (SI)</i> &mdash; base vs. derived quantities, the model for this document's derived-quantity treatment (&sect;5).</li>
+</ol>
+
+
+</div>
+
+<div class="paper-footer">
+  <a href="video-space.html">&larr; Back to Video Parameter Space</a> &middot; <a href="content-space-3d.html">Open the interactive 3D prototype &rarr;</a>
+</div>
+
+</body>
+</html>
